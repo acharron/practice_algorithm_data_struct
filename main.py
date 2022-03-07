@@ -21,6 +21,7 @@ def test_rod_cutting():
 
 def test_n_queen():
     n_queen.util_print_board(n_queen.start_pos)
+    print(n_queen.calc_conflicts_for_row(n_queen.start_pos, 1))
 
 
 if __name__ == '__main__':
