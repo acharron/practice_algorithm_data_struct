@@ -1,4 +1,5 @@
 import dynamic_rod_cutting
+import n_queen
 from min_heap import MinHeap
 
 
@@ -18,6 +19,12 @@ def test_rod_cutting():
     dynamic_rod_cutting.print_best_cuts(length)
 
 
+def test_n_queen():
+    n_queen.util_print_board(n_queen.start_pos)
+
+
 if __name__ == '__main__':
     # test_min_heap()
-    test_rod_cutting()
+    # test_rod_cutting()
+    test_n_queen()
+
