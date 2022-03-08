@@ -5,6 +5,11 @@ import timelog
 start_pos = []
 current_pos = []
 n = 0
+queens_on_col = []
+queens_on_up_diag = []
+queens_on_down_diag = []
+conflicts_in_row_buffer = []
+
 queens_left = {i for i in range(n)}
 queens_done = set()
 
@@ -28,12 +33,25 @@ def init_start_pos_v0_2(size: int):
     global start_pos
     global current_pos
     global n
+    global queens_on_col
+    global queens_on_up_diag
+    global queens_on_down_diag
+    global conflicts_in_row_buffer
+    # Init global arrays
     n = size
     start_pos = [-1 for x in range(n)]
+    queens_on_col = [0] * n
+    queens_on_up_diag = [0] * (2*n-1)
+    queens_on_down_diag = [0] * (2*n-1)
+    conflicts_in_row_buffer = [0] * n
+
+    # Place queens
     for r in range(n):
         # Move queen to a cell with min conflict (random between ties)
         new_col = fetch_col_with_min_conflict_in_row(start_pos, r)
+        # Add queen on board
         start_pos[r] = new_col
+        add_queen(r, new_col)
         # timelog.mid(f"init_start_pos_v0_2() : Placing new queen at {(r, new_col)}(row, col)")
     current_pos = start_pos
 
@@ -53,57 +71,24 @@ def util_print_board(positions):
 
 def calc_conflicts_for_cell(positions, row, col):
     number_conflicts = 0
+    if positions[row] == col:
+        # ここにQがあるので、自分と conflict してしまうような扱いにならないように -3 を与える
+        number_conflicts -= 3
 
-    # Check for column conflict
-    # Worst case : no queens -> no break -> check all rows : O(n)
-    for r in range(0, row):
-        if positions[r] == col:
-            number_conflicts += 1
-            break
-    for r in range(row + 1, n):
-        if positions[r] == col:
-            number_conflicts += 1
-            break
-
-    # Check for diag -i -i (top left)
-    i = 1
-    while (col - i) >= 0 and (row - i) >= 0:
-        if positions[row - i] == col - i:
-            number_conflicts += 1
-            break
-        i += 1
-    # Check for diag -i +i (bottom left)
-    i = 1
-    while (col - i) >= 0 and (row + i) < n:
-        if positions[row + i] == col - i:
-            number_conflicts += 1
-            break
-        i += 1
-    # Check for diag +i -i (top right)
-    i = 1
-    while (col + i) < n and (row - i) >= 0:
-        if positions[row - i] == col + i:
-            number_conflicts += 1
-            break
-        i += 1
-    # Check for diag +i +i (bottom right)
-    i = 1
-    while (col + i) < n and (row + i) < n:
-        if positions[row + i] == col + i:
-            number_conflicts += 1
-            break
-        i += 1
+    number_conflicts += queens_on_col[col]
+    number_conflicts += queens_on_up_diag[row + col]
+    number_conflicts += queens_on_down_diag[n-1 + col - row]
 
     return number_conflicts
 
 
 def calc_conflicts_for_row(positions, row):
-    res = []
+    global conflicts_in_row_buffer
     for col in range(0, n):
         number_conflicts = calc_conflicts_for_cell(positions, row, col)
         # Add to res
-        res.append(number_conflicts)
-    return res
+        conflicts_in_row_buffer[col] = number_conflicts
+    return conflicts_in_row_buffer
 
 
 def fetch_random_queen_in_conflict():
@@ -130,6 +115,24 @@ def fetch_col_with_min_conflict_in_row(positions, row):
     return new_col
 
 
+def remove_queen(row, col):
+    global queens_on_col
+    global queens_on_up_diag
+    global queens_on_down_diag
+    queens_on_col[col] -= 1
+    queens_on_up_diag[row + col] -= 1
+    queens_on_down_diag[n - 1 + col - row] -= 1
+
+
+def add_queen(row, col):
+    global queens_on_col
+    global queens_on_up_diag
+    global queens_on_down_diag
+    queens_on_col[col] += 1
+    queens_on_up_diag[row + col] += 1
+    queens_on_down_diag[n - 1 + col - row] += 1
+
+
 def step_choose_random():
     global current_pos
     timelog.mid("step_choose_random() : start")
@@ -141,7 +144,7 @@ def step_choose_random():
     if queen_row == -1:
         print("No queen in conflict found, no more conflicts?")
         return
-    queen_col = current_pos[queen_row]
+    cur_col = current_pos[queen_row]
     # print(f"Random queen in conflict: {queen_col, queen_row} (col, row)")
     timelog.mid("step_choose_random() : after fetching a random queen in conflict")
 
@@ -150,6 +153,9 @@ def step_choose_random():
     new_col = fetch_col_with_min_conflict_in_row(current_pos, queen_row)
     timelog.mid("step_choose_random() : after fetching the min-conflict col in the row")
 
+    # Move queen
+    remove_queen(queen_row, cur_col)
+    add_queen(queen_row, new_col)
     current_pos[queen_row] = new_col
     timelog.mid("step_choose_random() : end")
 
