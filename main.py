@@ -1,5 +1,6 @@
 import dynamic_rod_cutting
 import n_queen
+import timelog
 from min_heap import MinHeap
 
 
@@ -20,11 +21,13 @@ def test_rod_cutting():
 
 
 def test_n_queen():
-    n = 20
+    n = 200
     n_queen.init_start_pos(n)
+    timelog.start()
     # n_queen.util_print_board(n_queen.current_pos)
     n_queen.naive_min_conflict_no_backtrack()
     # n_queen.util_print_board(n_queen.current_pos)
+    timelog.end()
 
 
 if __name__ == '__main__':

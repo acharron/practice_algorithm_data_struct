@@ -1,5 +1,7 @@
 import random
 
+import timelog
+
 start_pos = []
 current_pos = []
 n = 0
@@ -84,8 +86,9 @@ def calc_conflicts_for_row(positions, row):
     return res
 
 
-def step():
+def step_choose_random():
     global current_pos
+    timelog.mid("step_choose_random() : start")
 
     # Calculer le nombre de conflits pour chaque reine
     conflicts_for_each_queen = []
@@ -95,6 +98,7 @@ def step():
         conflicts_for_each_queen.append(conflicts)
     # print(f"Current conflicts for each queen: {conflicts_for_each_queen}")
     # print(f"{max(conflicts_for_each_queen)}")
+    timelog.mid("step_choose_random() : after finding all queens conflict")
 
     # Prendre une reine qui est en conflit au hasard
     rows_with_queen_in_conflict = [i for i, e in enumerate(conflicts_for_each_queen) if e != 0]
@@ -106,6 +110,7 @@ def step():
 
     # La bouger sur une case avec le min-conflit dans sa row (au hasard si tie)
     row_conflicts = calc_conflicts_for_row(current_pos, queen_row)
+    timelog.mid("step_choose_random() : after calc conflicts for row")
     min_conflict = min(row_conflicts)
     candidate_cols = [i for i, e in enumerate(row_conflicts) if e == min_conflict]
     # print(f"Moving the queen into one of those cols: {candidate_cols}")
@@ -113,28 +118,34 @@ def step():
     # print(f"Moving to {(new_col, queen_row)}")
 
     current_pos[queen_row] = new_col
+    timelog.mid("step_choose_random() : end")
 
 
 def naive_min_conflict_no_backtrack():
+    """v0.1 : min-conflict を利用して、ランダムでQを選ぶ
+    var-left / var-done は実装なし、backtrackも利用していない"""
     max_steps = 10000
     s = 1
     found_solution = False
 
     while s < max_steps and found_solution is False:
         # Calculer le nombre de conflits pour chaque reine
+        timelog.mid("naive_min_conflict_no_backtrack() : New while loop step")
         conflicts_for_each_queen = []
         for r in range(n):
             c = current_pos[r]
             conflicts = calc_conflicts_for_cell(current_pos, r, c)
             conflicts_for_each_queen.append(conflicts)
         # If no more conflicts, then stop
+        timelog.mid("naive_min_conflict_no_backtrack() : After finding all queen conflicts")
         if max(conflicts_for_each_queen) == 0:
-            print(f"Final no conflict position: {current_pos}")
+            print("DONE")
+            # print(f"Final no conflict position: {current_pos}")
             found_solution = True
             print(f"Steps = {s}")
-            # return "Done"
+            return
         else:
-            step()
+            step_choose_random()
         # Increment step
         s += 1
 
