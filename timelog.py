@@ -3,16 +3,20 @@ import time
 
 start_time = 0
 last_time = 0
+IS_QUIET = False
 
 
 def start():
     global start_time
+    global last_time
     start_time = time.process_time()
+    last_time = time.process_time()
     print("LOG : START")
 
 
 def mid(msg):
-    # return
+    if IS_QUIET:
+        return
     global last_time
     current = time.process_time()
     total = current - start_time

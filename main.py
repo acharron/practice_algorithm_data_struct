@@ -1,3 +1,5 @@
+import cProfile
+
 import dynamic_rod_cutting
 import n_queen
 import timelog
@@ -21,9 +23,14 @@ def test_rod_cutting():
 
 
 def test_n_queen():
-    n = 200
-    n_queen.init_start_pos(n)
+    n = 400
+    # Make the starting position
     timelog.start()
+    n_queen.init_start_pos_v0_2(n)
+    timelog.mid("Starting position created")
+
+    # Solve
+    timelog.IS_QUIET = True
     # n_queen.util_print_board(n_queen.current_pos)
     n_queen.naive_min_conflict_no_backtrack()
     # n_queen.util_print_board(n_queen.current_pos)
@@ -34,4 +41,5 @@ if __name__ == '__main__':
     # test_min_heap()
     # test_rod_cutting()
     test_n_queen()
-
+    # cProfile.run('n_queen.init_start_pos_v0_2(400)', sort="cumulative")
+    # cProfile.run('n_queen.naive_min_conflict_no_backtrack()', sort="cumulative")
