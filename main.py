@@ -23,10 +23,10 @@ def test_rod_cutting():
 
 
 def test_n_queen():
-    n = 5000
+    n = pow(10, 5)
     # Make the starting position
     timelog.start()
-    n_queen.init_start_pos_v0_2(n)
+    n_queen.init_start_pos_v0_4(n)
     timelog.mid("Starting position created")
 
     # Solve
@@ -42,5 +42,5 @@ if __name__ == '__main__':
     # test_rod_cutting()
     test_n_queen()
     timelog.IS_QUIET = True
-    # cProfile.run('n_queen.init_start_pos_v0_2(2000)', sort="cumulative")
+    # cProfile.run('n_queen.init_start_pos_v0_4(1000000)', sort="cumulative")
     # cProfile.run('n_queen.naive_min_conflict_no_backtrack()', sort="cumulative")
