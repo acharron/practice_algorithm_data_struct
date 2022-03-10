@@ -14,6 +14,13 @@ conflicts_in_row_buffer = []
 queens_left = {i for i in range(n)}
 queens_done = set()
 
+# ログ、ボトルネックの確認用
+all_tries_fetch_queen_conflict = 0
+all_time_fetch_queen_conflict = 0
+
+all_tries_check_for_conflict = 0
+all_time_check_for_conflict = 0
+
 
 def init_start_pos_v0_1(size: int):
     """最初のQのポジションを指定する
@@ -53,7 +60,6 @@ def init_start_pos_v0_2(size: int):
         # Add queen on board
         start_pos[r] = new_col
         add_queen(r, new_col)
-        # timelog.mid(f"init_start_pos_v0_2() : Placing new queen at {(r, new_col)}(row, col)")
     current_pos = start_pos
 
 
@@ -64,7 +70,6 @@ def init_start_pos_v0_4(size: int):
     If not, pick another random col and check
     If not, pick another random col and check, ... : max numbers of tries = T
     If at the last try (Tth try) we still don't have < C conflicts, just pick the min between all those tested so far"""
-
     global start_pos
     global current_pos
     global n
@@ -81,8 +86,8 @@ def init_start_pos_v0_4(size: int):
     conflicts_in_row_buffer = [0] * n
 
     # Constants for queen placement
-    CONFLICT_THRESH = 0  # できれば、置くセルが2つ以下のconflictになっている
-    TRIES_THRESH = 100000  # ランダムでセルを試して、上限10回やってみる
+    CONFLICT_THRESH = 0  # できれば、置くセルが0つ以下のconflictになっている
+    TRIES_THRESH = 500000  # ランダムでセルを試して、上限10回やってみる
     number_non_optimal_cells = 0
 
     # Place queens
@@ -111,7 +116,6 @@ def init_start_pos_v0_4(size: int):
         # Add queen on board
         start_pos[r] = least_worst_col
         add_queen(r, least_worst_col)
-        # timelog.mid(f"init_start_pos_v0_2() : Placing new queen at {(r, new_col)}(row, col)")
 
     print(f"Starting position done, {number_non_optimal_cells} cells with conflicts")
     current_pos = start_pos
@@ -152,14 +156,10 @@ def calc_conflicts_for_row(positions, row):
     return conflicts_in_row_buffer
 
 
-all_tries = 0
-all_time = 0
-
-
 # FIXME : Bottleneck : When very few conflicts left, we have to check all queens -> O(n)
 def fetch_random_queen_in_conflict():
-    global all_tries
-    global all_time
+    global all_tries_fetch_queen_conflict
+    global all_time_fetch_queen_conflict
     """現在conflict中のQを探す : ランダムなQを見て、conflictがない限り別のQを検討"""
     start_time = time.process_time()
     s = 0
@@ -169,14 +169,13 @@ def fetch_random_queen_in_conflict():
         queen_col = current_pos[queen_row]
         conflicts = calc_conflicts_for_cell(current_pos, queen_row, queen_col)
         if conflicts != 0:
-            all_tries += s
-            all_time += time.process_time() - start_time
+            all_tries_fetch_queen_conflict += s
+            all_time_fetch_queen_conflict += time.process_time() - start_time
             return queen_row
         s += 1
     return -1
 
 
-# FIXME : Bottleneck : O(n^2)
 def fetch_col_with_min_conflict_in_row(positions, row):
     """ある行の中, min-conflict であるセルを返す"""
     # 行の全てのセルのconflict数を計算
@@ -208,8 +207,6 @@ def add_queen(row, col):
 
 def step_choose_random():
     global current_pos
-    timelog.mid("step_choose_random() : start")
-
     # Fetch a random queen in conflict
     # At the start, lots of conflicts, easy to find one, not too long
     # In the end, worst case, check all queens to find the one without conflict
@@ -219,21 +216,35 @@ def step_choose_random():
         return
     cur_col = current_pos[queen_row]
     # print(f"Random queen in conflict: {queen_col, queen_row} (col, row)")
-    timelog.mid("step_choose_random() : after fetching a random queen in conflict")
 
     # Move the queen to the cell with the min-conflict in the row (random between ties)
-    # O(n^2)
+    # O(n)
     new_col = fetch_col_with_min_conflict_in_row(current_pos, queen_row)
-    timelog.mid("step_choose_random() : after fetching the min-conflict col in the row")
 
     # Move queen
     remove_queen(queen_row, cur_col)
     add_queen(queen_row, new_col)
     current_pos[queen_row] = new_col
-    timelog.mid("step_choose_random() : end")
 
 
-def naive_min_conflict_no_backtrack():
+def check_if_still_has_conflicts():
+    global all_tries_check_for_conflict
+    global all_time_check_for_conflict
+
+    check_conflict_start_time = time.process_time()
+    has_conflict = False
+    for r in range(n):
+        c = current_pos[r]
+        conflicts = calc_conflicts_for_cell(current_pos, r, c)
+        all_tries_check_for_conflict += 1  # ログ用
+        if conflicts != 0:
+            has_conflict = True
+            all_time_check_for_conflict += time.process_time() - check_conflict_start_time  # ログ用
+            break
+    return has_conflict
+
+
+def solve_min_conflict_hill_climbing_no_backtrack():
     """v0.2 : min-conflict を利用して、ランダムでQを選ぶ
     v0.1 よりQの選び方、計算の数を減らしている、少しだけの改善
     var-left / var-done は実装なし、backtrackも利用していない"""
@@ -244,31 +255,27 @@ def naive_min_conflict_no_backtrack():
     start_time = time.process_time()
 
     while s < max_steps and found_solution is False:
+        timelog.mid("naive_min_conflict_no_backtrack() : New while loop step")
+
         # Safeguard against too long execution
         if time.process_time() - start_time > 150:
             print(f"Too long, spent more than 150s, at step {s}")
             break
 
         # Find if there is still a conflict : pick a queen and check until a conflict is found
-        timelog.mid("naive_min_conflict_no_backtrack() : New while loop step")
-        has_conflict = False
-        for r in range(n):
-            # O(n^2) : n * calc_conflicts_for_cell
-            # Worst case (no conflict) for calc_conflicts_for_cell : O(n)
-            c = current_pos[r]
-            conflicts = calc_conflicts_for_cell(current_pos, r, c)
-            if conflicts != 0:
-                has_conflict = True
-                break
+        has_conflict = check_if_still_has_conflicts()
+
         # If no more conflicts, then stop
-        timelog.mid("naive_min_conflict_no_backtrack() : After finding if there is a queen conflict")
         if not has_conflict:
             print("DONE")
             found_solution = True
             print(f"Steps = {s}")
             print(f"Finished the solve. Fetching a random queen in conflict "
-                  f"took {all_tries} steps and {all_time:.4f} seconds")
+                  f"took {all_tries_fetch_queen_conflict} steps and {all_time_fetch_queen_conflict:.4f} seconds")
+            print(f"Checking if there is still a conflict took {all_tries_check_for_conflict} steps "
+                  f"and {all_time_check_for_conflict:.4f} seconds")
             return
+        # else next step, move another queen
         else:
             step_choose_random()
         # Increment step

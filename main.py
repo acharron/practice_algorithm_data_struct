@@ -23,7 +23,7 @@ def test_rod_cutting():
 
 
 def test_n_queen():
-    n = pow(10, 5)
+    n = pow(10, 6)
     # Make the starting position
     timelog.start()
     n_queen.init_start_pos_v0_4(n)
@@ -32,7 +32,7 @@ def test_n_queen():
     # Solve
     timelog.IS_QUIET = True
     # n_queen.util_print_board(n_queen.current_pos)
-    n_queen.naive_min_conflict_no_backtrack()
+    n_queen.solve_min_conflict_hill_climbing_no_backtrack()
     # n_queen.util_print_board(n_queen.current_pos)
     timelog.end()
 
