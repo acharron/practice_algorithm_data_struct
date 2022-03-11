@@ -24,16 +24,18 @@ def test_rod_cutting():
 
 def test_n_queen():
     n = pow(10, 6)
-    # Make the starting position
+
+    n_queen_solver = n_queen.NQueen(n)
+
     timelog.start()
-    n_queen.init_start_pos_v0_4(n)
+
+    n_queen_solver.preprocess_starting_position()
+
     timelog.mid("Starting position created")
 
     # Solve
     timelog.IS_QUIET = True
-    # n_queen.util_print_board(n_queen.current_pos)
-    n_queen.solve_min_conflict_hill_climbing_no_backtrack()
-    # n_queen.util_print_board(n_queen.current_pos)
+    n_queen_solver.solve_min_conflict_hill_climbing_no_backtrack()
     timelog.end()
 
 
@@ -42,5 +44,6 @@ if __name__ == '__main__':
     # test_rod_cutting()
     test_n_queen()
     timelog.IS_QUIET = True
-    # cProfile.run('n_queen.init_start_pos_v0_4(1000000)', sort="cumulative")
-    # cProfile.run('n_queen.solve_min_conflict_hill_climbing_no_backtrack()', sort="cumulative")
+    # n_queen_solver = n_queen.NQueen(pow(10, 5))
+    # cProfile.run('n_queen_solver.preprocess_starting_position()', sort="cumulative")
+    # cProfile.run('n_queen_solver.solve_min_conflict_hill_climbing_no_backtrack()', sort="cumulative")
