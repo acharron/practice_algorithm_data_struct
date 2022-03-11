@@ -43,4 +43,4 @@ if __name__ == '__main__':
     test_n_queen()
     timelog.IS_QUIET = True
     # cProfile.run('n_queen.init_start_pos_v0_4(1000000)', sort="cumulative")
-    # cProfile.run('n_queen.naive_min_conflict_no_backtrack()', sort="cumulative")
+    # cProfile.run('n_queen.solve_min_conflict_hill_climbing_no_backtrack()', sort="cumulative")

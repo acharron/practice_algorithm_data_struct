@@ -14,6 +14,12 @@ conflicts_in_row_buffer = []
 queens_left = {i for i in range(n)}
 queens_done = set()
 
+queens_in_conflict = set()
+
+# Constants for queen placement (preprocess)
+CONFLICT_THRESH = 0  # できれば、置くセルが0つ以下のconflictになっている
+TRIES_THRESH = 500000  # ランダムでセルを試して、上限10回やってみる
+
 # ログ、ボトルネックの確認用
 all_tries_fetch_queen_conflict = 0
 all_time_fetch_queen_conflict = 0
@@ -70,7 +76,6 @@ def init_start_pos_v0_4(size: int):
     If not, pick another random col and check
     If not, pick another random col and check, ... : max numbers of tries = T
     If at the last try (Tth try) we still don't have < C conflicts, just pick the min between all those tested so far"""
-    global start_pos
     global current_pos
     global n
     global queens_on_col
@@ -79,20 +84,16 @@ def init_start_pos_v0_4(size: int):
     global conflicts_in_row_buffer
     # Init global arrays
     n = size
-    start_pos = [-1 for x in range(n)]
+    current_pos = [-1 for x in range(n)]
     queens_on_col = [0] * n
     queens_on_up_diag = [0] * (2 * n - 1)
     queens_on_down_diag = [0] * (2 * n - 1)
     conflicts_in_row_buffer = [0] * n
 
-    # Constants for queen placement
-    CONFLICT_THRESH = 0  # できれば、置くセルが0つ以下のconflictになっている
-    TRIES_THRESH = 500000  # ランダムでセルを試して、上限10回やってみる
     number_non_optimal_cells = 0
 
     # Place queens
     for r in range(n):
-        new_col = -1
         tries = 0
         least_worst_col = -1
         least_worst_conflicts = 1000000  # infinity のような高い数字
@@ -100,9 +101,9 @@ def init_start_pos_v0_4(size: int):
         while tries < TRIES_THRESH:
             # Pick a col at random, check if it has < C conflicts
             random_col = random.randrange(0, n)
-            conflict = calc_conflicts_for_cell(start_pos, r, random_col)
+            conflict = calc_conflicts_for_cell(current_pos, r, random_col)
             if conflict <= CONFLICT_THRESH:
-                # Good enough col found! when can exit
+                # Good enough col found! We can exit
                 least_worst_col = random_col
                 break
             elif conflict < least_worst_conflicts:
@@ -110,15 +111,16 @@ def init_start_pos_v0_4(size: int):
                 least_worst_col = random_col
                 least_worst_conflicts = conflict
             if tries == TRIES_THRESH - 1:
+                # 諦める
                 number_non_optimal_cells += 1  # 諦めて妥協したセルの数
+                event_move_queen_in_conflict_position(r, least_worst_col)
             tries += 1
 
         # Add queen on board
-        start_pos[r] = least_worst_col
+        current_pos[r] = least_worst_col
         add_queen(r, least_worst_col)
 
     print(f"Starting position done, {number_non_optimal_cells} cells with conflicts")
-    current_pos = start_pos
 
 
 def util_print_board(positions):
@@ -156,26 +158,6 @@ def calc_conflicts_for_row(positions, row):
     return conflicts_in_row_buffer
 
 
-# FIXME : Bottleneck : When very few conflicts left, we have to check all queens -> O(n)
-def fetch_random_queen_in_conflict():
-    global all_tries_fetch_queen_conflict
-    global all_time_fetch_queen_conflict
-    """現在conflict中のQを探す : ランダムなQを見て、conflictがない限り別のQを検討"""
-    start_time = time.process_time()
-    s = 0
-    random_queen_order = [x for x in range(n)]
-    random.shuffle(random_queen_order)
-    for queen_row in random_queen_order:
-        queen_col = current_pos[queen_row]
-        conflicts = calc_conflicts_for_cell(current_pos, queen_row, queen_col)
-        if conflicts != 0:
-            all_tries_fetch_queen_conflict += s
-            all_time_fetch_queen_conflict += time.process_time() - start_time
-            return queen_row
-        s += 1
-    return -1
-
-
 def fetch_col_with_min_conflict_in_row(positions, row):
     """ある行の中, min-conflict であるセルを返す"""
     # 行の全てのセルのconflict数を計算
@@ -185,6 +167,89 @@ def fetch_col_with_min_conflict_in_row(positions, row):
     candidate_cols = [i for i, e in enumerate(row_conflicts) if e == min_conflict]
     new_col = random.choice(candidate_cols)
     return new_col
+
+
+def fetch_random_queen_in_conflict():
+    """現在conflict中のQを探す : ランダムなQを見て、conflictがない限り別のQを検討"""
+    global all_tries_fetch_queen_conflict
+    global all_time_fetch_queen_conflict
+    start_time = time.process_time()
+
+    # conflict中のクイーンのsetから試していく
+    # だんだんpopしていくので最終的に全てがなくなるはず
+    while len(queens_in_conflict) > 0:
+        queen_row, queen_col = queens_in_conflict.pop()
+        conflicts = calc_conflicts_for_cell(current_pos, queen_row, queen_col)
+        all_tries_fetch_queen_conflict += 1
+        if conflicts != 0:
+            all_time_fetch_queen_conflict += time.process_time() - start_time
+            return queen_row
+
+    # In the last resort, we didn't find any queen in the set which was still in conflict
+    # So let's try all the queens to find where there is still a conflict...
+    print("No more queen in the queens_in_conflict set !")
+    random_queen_order = [x for x in range(n)]
+    random.shuffle(random_queen_order)
+    for queen_row in random_queen_order:
+        queen_col = current_pos[queen_row]
+        conflicts = calc_conflicts_for_cell(current_pos, queen_row, queen_col)
+        all_tries_fetch_queen_conflict += 1
+        if conflicts != 0:
+            all_time_fetch_queen_conflict += time.process_time() - start_time
+            return queen_row
+    return -1
+
+
+def event_move_queen_in_conflict_position(row, col):
+    """「今から置くクイーンは、どこかとconflictしているので、 queens_in_conflict を更新"""
+    # 置くクイーン(Qa)を登録
+    queens_in_conflict.add((row, col))
+    # そのクイーン(Qa)がどことconflictしているかを探す
+    # conflict しているクイーン(Qb, Qc, ...)も queens_in_conflict に登録
+    # 同じカラムでconflictしているか？
+    try:
+        # Check if there is one on the same column
+        # But don't count the current (row, col) queen!
+        # Remove the current queen temporarily, just for the column check
+        current_pos[row] = -1
+        has_same_col_queen_row = current_pos.index(col)
+        queens_in_conflict.add((has_same_col_queen_row, col))
+    except ValueError:
+        # no queen on the same column
+        pass
+    current_pos[row] = col
+
+    # Check for diag -i -i (top left)
+    i = 1
+    while (col - i) >= 0 and (row - i) >= 0:
+        if current_pos[row - i] == col - i:
+            queens_in_conflict.add((row - i, col - i))
+            break
+        i += 1
+
+    # Check for diag -i +i (bottom left)
+    i = 1
+    while (col - i) >= 0 and (row + i) < n:
+        if current_pos[row + i] == col - i:
+            queens_in_conflict.add((row + i, col - i))
+            break
+        i += 1
+
+    # Check for diag +i -i (top right)
+    i = 1
+    while (col + i) < n and (row - i) >= 0:
+        if current_pos[row - i] == col + i:
+            queens_in_conflict.add((row - i, col + i))
+            break
+        i += 1
+
+    # Check for diag +i +i (bottom right)
+    i = 1
+    while (col + i) < n and (row + i) < n:
+        if current_pos[row + i] == col + i:
+            queens_in_conflict.add((row + i, col + i))
+            break
+        i += 1
 
 
 def remove_queen(row, col):
@@ -225,11 +290,19 @@ def step_choose_random():
     remove_queen(queen_row, cur_col)
     add_queen(queen_row, new_col)
     current_pos[queen_row] = new_col
+    if calc_conflicts_for_cell(current_pos, queen_row, new_col) > 0:
+        event_move_queen_in_conflict_position(queen_row, new_col)
 
 
 def check_if_still_has_conflicts():
     global all_tries_check_for_conflict
     global all_time_check_for_conflict
+
+    if len(queens_in_conflict) > 0:
+        all_tries_check_for_conflict += 1
+        return True
+    else:
+        print("check_if_still_has_conflicts() : queens_in_conflict set is empty, let's check all queens to be sure")
 
     check_conflict_start_time = time.process_time()
     has_conflict = False
@@ -241,6 +314,7 @@ def check_if_still_has_conflicts():
             has_conflict = True
             all_time_check_for_conflict += time.process_time() - check_conflict_start_time  # ログ用
             break
+    print(f"check_if_still_has_conflicts() : After checking all cells, has_conflict = {has_conflict}")
     return has_conflict
 
 
