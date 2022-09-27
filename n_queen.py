@@ -1,6 +1,7 @@
 import math
 import random
 import time
+from collections import deque
 
 import timelog
 
@@ -16,10 +17,18 @@ class NQueen:
         self.queens_in_conflict = set()
 
         # Constant for queen placement (preprocess)
-        self.TRIES_THRESH = 4 * math.floor(n / 10)  # ランダムでセルを試して、上限10回やってみる
+        self.TRIES_THRESH = 5 * math.floor(n / 10)  # ランダムでセルを試して、上限10回やってみる
 
     def preprocess_starting_position(self):
         number_non_optimal_cells = 0
+
+        # ここが breakthrough! 「次試してみる col」 random_col の取得は昔
+        #   random_col = random.randrange(0, self.n)
+        # でやっていたが、かなりのボトルネックだった
+        # deque を利用して「初期ポジションの時、一回利用した col をそもそも試さない (必ずコンフリクトがあるから)」の改善！
+        random_cell_picker = list(range(self.n))
+        random.shuffle(random_cell_picker)
+        random_cell_picker = deque(random_cell_picker)
 
         # それぞれのrowに1個のクイーンを置く
         for r in range(self.n):
@@ -29,7 +38,8 @@ class NQueen:
             # 最悪の場合、conflictがないセルを探す回数は TRIES_THRESH 回までにする
             while tries < self.TRIES_THRESH:
                 # ランダムでセルを選択して、conflict数を計算
-                random_col = random.randrange(0, self.n)
+                random_col = random_cell_picker.popleft()   # GOOD!!
+                # random_col = random.randrange(0, self.n)  # Bad
                 conflict = self.calc_conflicts_for_cell(r, random_col)
                 if conflict == 0:
                     # conflictがないセルを見つけた！これでもう終了
@@ -43,6 +53,7 @@ class NQueen:
                     # 諦める
                     number_non_optimal_cells += 1  # 諦めて合計で妥協したセルの数
                     self.event_move_queen_in_conflict_position(r, least_worst_col)
+                random_cell_picker.append(random_col)  # 試してみたが、今回の r だとコンフリクトが起きてるので、 picker の尻尾に戻す (また今度別の r で試せる)
                 tries += 1
 
             # ボードにクイーンを入れる
